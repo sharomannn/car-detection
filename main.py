@@ -80,6 +80,11 @@ def transform_and_resize(crop_obj):
 
 
 def recognize_license_plate(car_area, model, lpr_model, names, idx):
+    # Check if the car area has zero height or width
+    if car_area.shape[0] == 0 or car_area.shape[1] == 0:
+        print("Car area has zero height or width. Skipping...")
+        return
+
     # Обнаружение номерного знака на области автомобиля
     results = model.predict(car_area, show=False)
     since = time.time()
@@ -117,9 +122,13 @@ def recognize_license_plate(car_area, model, lpr_model, names, idx):
                 # Сохраняем результат в CSV-файл
                 df.to_csv("license_plate_recognition_results.csv", mode='a', header=False, index=False)
 
+                return car_area, license_plate
+
+            return None, None
+
 
 def main():
-    cap, video_writer = load_video('videos/2.mp4')
+    cap, video_writer = load_video()
     model, coco_model, lpr_model, names = load_model()
     idx = 0
 
@@ -132,6 +141,10 @@ def main():
             if not success:
                 print("Video frame is empty or video processing has been successfully completed.")
                 break
+
+            if im0.size == 0:
+                print("Empty frame. Skipping...")
+                continue
 
             vehicle_bounding_boxes = detect_cars(im0, coco_model)
 
@@ -150,6 +163,3 @@ def main():
         cap.release()
         video_writer.release()
         cv2.destroyAllWindows()
-
-
-main()
