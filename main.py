@@ -6,16 +6,26 @@ from sort.sort import *
 from util import get_car, read_license_plate, write_csv
 
 
+def validate_bounding_box(bbox):
+    if len(bbox) != 4:
+        return False
+    for value in bbox:
+        if not isinstance(value, (int, float)) or value < 0:
+            return False
+    if bbox[2] == 0 or bbox[3] == 0:
+        return False
+    return True
+
 results = {}
 
 mot_tracker = Sort()
 
 # load models
 coco_model = YOLO('yolov8n.pt')
-license_plate_detector = YOLO('./models/license_plate_detector.pt')
+license_plate_detector = YOLO('./models/best.pt')
 
 # load video
-cap = cv2.VideoCapture('./sample.mp4')
+cap = cv2.VideoCapture('./videos/1.webm')
 
 vehicles = [2, 3, 5, 7]
 
@@ -36,7 +46,10 @@ while ret:
                 detections_.append([x1, y1, x2, y2, score])
 
         # track vehicles
-        track_ids = mot_tracker.update(np.asarray(detections_))
+        try:
+            track_ids = mot_tracker.update(np.asarray(detections_))
+        except IndexError as e:
+            print(f"Error: {e}. Frame number: {frame_nmr}, detections: {detections_}")
 
         # detect license plates
         license_plates = license_plate_detector(frame)[0]
