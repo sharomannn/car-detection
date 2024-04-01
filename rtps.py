@@ -1,10 +1,10 @@
-import tempfile
 import cv2
 import subprocess
 import pandas as pd
 import argparse
 from main import load_model, load_video, detect_cars, recognize_license_plate
 import time
+import streamlit as st
 from src.config.config import get_cfg_defaults
 
 cfg = get_cfg_defaults()
@@ -22,9 +22,9 @@ rtsp_url = args.rtsp_url
 n = 4
 
 
-
 def call():
-    pass
+    command = ['adb', 'shell', 'am', 'start', '-a', 'android.intent.action.CALL', '-d', 'tel:89631333413']
+    subprocess.run(command, check=True)
 
 cap = cv2.VideoCapture(rtsp_url)
 model, coco_model, lpr_model, names = load_model()

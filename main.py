@@ -1,6 +1,9 @@
 import os
 import re
 import time
+import sqlite3
+from datetime import datetime, timedelta
+import streamlit as st
 
 import cv2
 import pandas as pd
@@ -13,6 +16,7 @@ from src.config.config import get_cfg_defaults
 from src.tools.utils import decode_function, BeamDecoder
 
 cfg = get_cfg_defaults()
+
 
 
 def load_model():
@@ -39,12 +43,14 @@ def load_video(video):
                                    fps, (w, h))
     return cap, video_writer
 
-
 VEHICLE_CLASS_IDS = [2, 3, 5]
 
-
 def detect_cars(im0, coco_model):
-    # Car detection
+    # ROI = (750, 270, 900 + 840, 270 + 700)
+    # # Ограничиваем область обнаружения автомобилей до ROI
+    # im0 = im0[ROI[1]:ROI[3], ROI[0]:ROI[2]]
+
+    # Обнаружение автомобилей
     car_detections = coco_model.track(im0, persist=True)[0]
     vehicle_bounding_boxes = []
     for detection in car_detections.boxes.data.tolist():
@@ -55,8 +61,8 @@ def detect_cars(im0, coco_model):
 
         if int(class_id) in VEHICLE_CLASS_IDS and score > 0.5:
             vehicle_bounding_boxes.append([x1, y1, x2, y2, track_id, score])
-    return vehicle_bounding_boxes
 
+    return vehicle_bounding_boxes
 
 def draw_rectangle_and_label(car_area, box, cls, names):
     # Рисуем прямоугольник и метку
@@ -116,11 +122,28 @@ def recognize_license_plate(car_area, model, lpr_model, names, idx):
 
             # Проверяем, соответствует ли номерной знак формату
             if re.match(r'^[A-Z]\d{3}[A-Z]{2}\d{2,3}$', license_plate):
-                df = pd.DataFrame([{"frame": idx, "x1": box[0], "y1": box[1], "x2": box[2], "y2": box[3],
-                                    "license_plate": license_plate}], index=[0])
+                # Создаем новое подключение к базе данных
+                conn = sqlite3.connect('recognition_history.db')
+                c = conn.cursor()
 
-                # Сохраняем результат в CSV-файл
-                df.to_csv("license_plate_recognition_results.csv", mode='a', header=False, index=False)
+                # Создаем таблицу, если она еще не существует
+                c.execute('''
+                    CREATE TABLE IF NOT EXISTS recognition_history (
+                        timestamp TEXT,
+                        license_plate TEXT,
+                        image_path TEXT
+                    )
+                ''')
+
+                # Добавляем результат в базу данных
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]  # добавляем миллисекунды к временной метке
+                image_path = f"./images/{timestamp.replace(' ', '_')}.jpg"
+                cv2.imwrite(image_path, car_area)
+                c.execute("INSERT INTO recognition_history VALUES (?, ?, ?)", (timestamp, license_plate, image_path))
+                conn.commit()
+
+                # Закрываем подключение к базе данных
+                conn.close()
 
                 return car_area, license_plate
 

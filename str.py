@@ -1,3 +1,5 @@
+import glob
+import os
 import tempfile
 import cv2
 import subprocess
@@ -6,16 +8,22 @@ import streamlit as st
 from main import load_model, load_video, detect_cars, recognize_license_plate
 import time
 from src.config.config import get_cfg_defaults
+import sqlite3
+from datetime import datetime, timedelta
+import streamlit as st
 
 cfg = get_cfg_defaults()
 df = pd.read_csv('allowed_numbers.csv')
 last_call_time = 0
 last_image = None
+conn = sqlite3.connect('recognition_history.db')
+c = conn.cursor()
+
 
 
 st.title('Автоматическое распознавание номерных знаков')
 
-page = st.sidebar.selectbox("Выберите страницу", ["Главная", "Детекция по видео", "Детекция по фото", "Детекция с камеры"])
+page = st.sidebar.selectbox("Выберите страницу", ["Главная", "Детекция по видео", "Детекция по фото", "Детекция с камеры", "История", "Очистить историю"])
 
 
 def call():
@@ -29,6 +37,33 @@ if page == "Главная":
 
     if st.button("Открыть шлакбаум"):
         call()
+
+elif page == "История":
+    st.header("История распознавания")
+
+    # Получаем историю распознавания из базы данных
+    c.execute("SELECT * FROM recognition_history")
+    rows = c.fetchall()
+
+    # Отображаем историю в Streamlit
+    for row in rows:
+        timestamp, license_plate, image_path = row
+        st.write(f"{timestamp}: {license_plate}")
+        st.image(image_path)
+
+
+elif page == "Очистить историю":
+    st.header("Очистить историю")
+
+    # Удаляем записи, которые старше суток
+    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+    c.execute("DELETE FROM recognition_history WHERE timestamp < ?", (yesterday,))
+    conn.commit()
+    st.write("История распознавания очищена.")
+    #Удаляем файлы изображений с диска
+    files = glob.glob('images/*')
+    for f in files:
+        os.remove(f)
 
 elif page == "Детекция по видео":
     st.header("Детекция по видео")
