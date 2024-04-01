@@ -23,7 +23,7 @@ def load_model():
                        dropout_prob=0,
                        out_indices=cfg.LPRNet.OUT_INDEXES)  # build your LPRNet model
     lpr_model.eval()
-    state_dict = torch.load("models/LPRNet_Ep_BEST_model.ckpt")
+    state_dict = torch.load("models/LPRNet_Ep_BEST_model.ckpt", map_location='cpu')
     lpr_model.load_state_dict(state_dict["net_state_dict"])
     names = model.names
 
